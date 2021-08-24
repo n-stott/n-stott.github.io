@@ -1,1 +1,217 @@
-Hello
+<!-- The main function of my C++ code is executed at the beginning after importing this js file, which also exposes the Module object -->
+<script src="./bin/yokai-lib.js"></script>
+
+<script language="javascript">
+
+    searchBestMove = Module.cwrap('searchBestMove', 'number', ['string', 'string', 'string', 'number', 'number'])
+    get_board = Module.cwrap('board', 'string', [])
+    get_reserve0 = Module.cwrap('reserve0', 'string', [])
+    get_reserve1 = Module.cwrap('reserve1', 'string', [])
+    
+    validAction = Module.cwrap('validAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
+    playAction = Module.cwrap('playAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
+
+    class Configuration {
+
+        constructor(board, reserve0, reserve1, player) {
+            this.board = board;
+            this.reserve0 = reserve0;
+            this.reserve1 = reserve1;
+            this.currentPlayer = player;
+        }
+
+        static Default() {
+            return new Configuration('TKB.P..p.bkt', '', '', 0);
+        }
+
+        update() {
+            this.board = get_board()
+            this.reserve0 = get_reserve0()
+            this.reserve1 = get_reserve1()
+            this.currentPlayer = 1-this.currentPlayer
+        }
+
+        autoPlay(depth) {
+            searchBestMove(
+                this.board,
+                this.reserve0,
+                this.reserve1,
+                this.currentPlayer,
+                depth
+            )
+            this.update()
+        }
+
+        play(action, piece, start, end) {
+            let valid = validAction(
+                this.board,
+                this.reserve0,
+                this.reserve1,
+                this.currentPlayer,
+                action,
+                piece,
+                start,
+                end
+            )
+            console.log(valid);
+            if(valid) {
+                playAction(
+                    this.board,
+                    this.reserve0,
+                    this.reserve1,
+                    this.currentPlayer,
+                    action,
+                    piece,
+                    start,
+                    end
+                )
+                this.update()
+            }
+        }
+
+        winner() {
+            if(this.reserve0.length > 0 && this.reserve0[this.reserve0.length-1] == 'k') return 0;
+            if(this.reserve1.length > 0 && this.reserve1[this.reserve1.length-1] == 'K') return 1;
+            return -1;
+        }
+
+        toString() {
+            return this.board + '|' + this.reserve0 + '|' + this.reserve1;
+        }
+        
+    }
+
+    class GameHistory {
+        constructor() {
+            this.history = [];
+        }
+    }
+
+
+    var selectedPos;
+    var config;
+    var difficulty;
+    var history;
+
+    function init(d) {
+        selectedPos = -1;
+        config = Configuration.Default();
+        difficulty = d;
+        history = new GameHistory()
+        // history.config += config;
+        draw();
+    }
+    init(5);
+
+    function writeHtml() {
+        W = 100
+        b = "";
+        b += "<button onclick=init(3)>Easy</button>";
+        b += "<button onclick=init(5)>Medium</button>";
+        b += "<button onclick=init(6)>Hard</button>";
+        b += "<div>Difficulty : <span id=difficulty></span></div>"; 
+        b += "<div> <table cellspacing=0 align=center>";
+        for(i = 0; i < 7; ++i) {
+            b += "<th width="+W+" height="+W+" onclick=C('r',"+i+",1)" +
+                    " style='border:2px solid #aae' id=r"+i+1+
+                    " bgcolor=#"+(i&1?"9090d0>":"c0c0ff>");
+        }
+        b += "</tr> </table> </div>";
+        b += "<div><table cellspacing=0 align=center>";
+        for(i = 0; i < 4; ++i) {
+            for(j = 0; j < 3; ++j) {
+                b += "<th width="+W+" height="+W+" onclick=C('b',"+i+","+j+")" +
+                     " style='border:2px solid #aae' id=b"+i+j +
+                     " bgcolor=#"+((3*i+j)&1?"9090d0>":"c0c0ff>");
+            }
+            b += "</tr>";
+        }
+        b += "</table> </div>";
+        b += "<div> <table cellspacing=0 align=center>";
+        for(i = 0; i < 7; ++i) {
+            b += "<th width="+W+" height="+W+" onclick=C('r',"+i+",0)" +
+                    " style='border:2px solid #aae' id=r"+i+0+
+                    " bgcolor=#"+(i&1?"9090d0>":"c0c0ff>");
+        }
+        b += "</tr> </table> </div>";
+        document.write(b);
+    }
+    writeHtml();
+
+    function C(part, i, j) {
+        console.log(part, i, j);
+        if(selectedPos == -1) {
+            selectedPos = part+i+j;
+        } else {
+            console.log("play");
+            if(selectedPos[0] == 'b' && part == 'b') {
+                i0 = parseInt(selectedPos[1]);
+                j0 = parseInt(selectedPos[2]);
+                p = 3*i0+j0;
+                config.play("move", config.board[p], p, 3*i+j);
+            } else if(selectedPos[0] == 'r' && selectedPos[2] == '0' && part == 'b'){
+                i0 = parseInt(selectedPos[1]);
+                p = i0;
+                config.play("drop", config.reserve0[p], p, 3*i+j);
+            }
+            draw();
+            if(config.winner() != -1) {
+                alert("Player : " + config.winner() + " has won !");
+                init();
+                draw();
+            }
+            selectedPos = -1;
+            if(config.currentPlayer == 1) {
+                config.autoPlay(difficulty);
+                draw();
+                if(config.winner() != -1) {
+                    alert("Player " + config.winner() + " has won !");
+                    init();
+                    draw();
+                }
+            }
+        }
+        draw();
+    }
+
+    function draw() {
+        W = 100
+        path = "img/simple/";
+        ext = ".gif"
+        if(q = document.getElementById("difficulty")) {
+            q.innerHTML = (difficulty == 3 ? 'Easy' : (difficulty == 5 ? 'Medium' : 'Hard'));
+        }
+        for(i = 0; i < 4; ++i) {
+            for(j = 0; j < 3; ++j) {
+                id = "b"+i+j;
+                if (q = document.getElementById(id)) {
+                    p = 3*i+j;
+                    charCode = config.board[3*i+j];
+                    if(charCode === '.') charCode = 'e';
+                    q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
+                    q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
+                }
+            }
+        }
+        for(i = 0; i < 7; ++i) {
+            id = "r"+i+0;
+            if (q = document.getElementById(id)) {
+                charCode = (i < config.reserve0.length ? config.reserve0[i] : 'e');
+                if(charCode === '.') charCode = 'e';
+                q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
+                q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
+            }
+        }
+        for(i = 0; i < 7; ++i) {
+            id = "r"+i+1;
+            if (q = document.getElementById(id)) {
+                charCode = (i < config.reserve1.length ? config.reserve1[i] : 'e');
+                if(charCode === '.') charCode = 'e';
+                q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
+                q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
+            }
+        }
+    }
+    draw();
+
+</script>
