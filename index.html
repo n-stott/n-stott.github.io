@@ -113,6 +113,7 @@
         b += "<button onclick=init(5)>Medium</button>";
         b += "<button onclick=init(6)>Hard</button>";
         b += "<div>Difficulty : <span id=difficulty></span></div>"; 
+        b += "Rules : "
         b += "<div> <table cellspacing=0 align=center>";
         for(i = 0; i < 7; ++i) {
             b += "<th width="+W+" height="+W+" onclick=C('r',"+i+",1)" +
@@ -158,7 +159,7 @@
             draw();
             if(config.winner() != -1) {
                 alert("Player : " + config.winner() + " has won !");
-                init();
+                init(difficulty);
                 draw();
             }
             selectedPos = -1;
@@ -167,7 +168,7 @@
                 draw();
                 if(config.winner() != -1) {
                     alert("Player " + config.winner() + " has won !");
-                    init();
+                    init(difficulty);
                     draw();
                 }
             }
