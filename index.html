@@ -32,6 +32,7 @@
         }
 
         autoPlay(depth) {
+            console.log("before AI : ", this.toString());
             searchBestMove(
                 this.board,
                 this.reserve0,
@@ -40,6 +41,7 @@
                 depth
             )
             this.update()
+            console.log("after AI : ", this.toString());
         }
 
         play(action, piece, start, end) {
@@ -53,8 +55,8 @@
                 start,
                 end
             )
-            console.log(valid);
             if(valid) {
+                console.log("before HU : ", this.toString());
                 playAction(
                     this.board,
                     this.reserve0,
@@ -66,6 +68,7 @@
                     end
                 )
                 this.update()
+                console.log("after HU : ", this.toString());
             }
         }
 
@@ -139,11 +142,9 @@
     writeHtml();
 
     function C(part, i, j) {
-        console.log(part, i, j);
         if(selectedPos == -1) {
             selectedPos = part+i+j;
         } else {
-            console.log("play");
             if(selectedPos[0] == 'b' && part == 'b') {
                 i0 = parseInt(selectedPos[1]);
                 j0 = parseInt(selectedPos[2]);
