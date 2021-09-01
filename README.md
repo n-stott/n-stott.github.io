@@ -1,2 +1,2 @@
-# n-stottt.github.io
+# n-stott.github.io
 Webpage
