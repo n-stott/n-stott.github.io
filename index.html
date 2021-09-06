@@ -1,219 +1,91 @@
-<!-- The main function of my C++ code is executed at the beginning after importing this js file, which also exposes the Module object -->
-<script src="./bin/yokai-lib.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>cm-chessboard</title>
+    <link rel="stylesheet" href="assets/styles/cm-chessboard.css"/>
+    <link rel="stylesheet" href="css/styles/examples.css"/>
+    <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1.0"/>
+    <script src="js/yokai/yokai-lib.js"></script>
+    <script src="js/yokai/yokai-api.js"></script>
+</head>
+<body>
+<h1>yokai no mori</h1>
+<div class="board" id="board"></div>
 
 <script language="javascript">
-
-    searchBestMove = Module.cwrap('searchBestMove', 'number', ['string', 'string', 'string', 'number', 'number'])
-    get_board = Module.cwrap('board', 'string', [])
-    get_reserve0 = Module.cwrap('reserve0', 'string', [])
-    get_reserve1 = Module.cwrap('reserve1', 'string', [])
-    
-    validAction = Module.cwrap('validAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
-    playAction = Module.cwrap('playAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
-
-    class Configuration {
-
-        constructor(board, reserve0, reserve1, player) {
-            this.board = board;
-            this.reserve0 = reserve0;
-            this.reserve1 = reserve1;
-            this.currentPlayer = player;
-        }
-
-        static Default() {
-            return new Configuration('TKB.P..p.bkt', '', '', 0);
-        }
-
-        update() {
-            this.board = get_board()
-            this.reserve0 = get_reserve0()
-            this.reserve1 = get_reserve1()
-            this.currentPlayer = 1-this.currentPlayer
-        }
-
-        autoPlay(depth) {
-            console.log("before AI : ", this.toString());
-            searchBestMove(
-                this.board,
-                this.reserve0,
-                this.reserve1,
-                this.currentPlayer,
-                depth
-            )
-            this.update()
-            console.log("after AI : ", this.toString());
-        }
-
-        play(action, piece, start, end) {
-            let valid = validAction(
-                this.board,
-                this.reserve0,
-                this.reserve1,
-                this.currentPlayer,
-                action,
-                piece,
-                start,
-                end
-            )
-            if(valid) {
-                console.log("before HU : ", this.toString());
-                playAction(
-                    this.board,
-                    this.reserve0,
-                    this.reserve1,
-                    this.currentPlayer,
-                    action,
-                    piece,
-                    start,
-                    end
-                )
-                this.update()
-                console.log("after HU : ", this.toString());
-            }
-        }
-
-        winner() {
-            if(this.reserve0.length > 0 && this.reserve0[this.reserve0.length-1] == 'k') return 0;
-            if(this.reserve1.length > 0 && this.reserve1[this.reserve1.length-1] == 'K') return 1;
-            return -1;
-        }
-
-        toString() {
-            return this.board + '|' + this.reserve0 + '|' + this.reserve1;
-        }
-        
-    }
-
-    class GameHistory {
-        constructor() {
-            this.history = [];
-        }
-    }
-
-
-    var selectedPos;
-    var config;
-    var difficulty;
-    var history;
-
-    function init(d) {
-        selectedPos = -1;
-        config = Configuration.Default();
-        difficulty = d;
-        history = new GameHistory()
-        // history.config += config;
-        draw();
-    }
-    init(5);
-
-    function writeHtml() {
-        W = 100
-        b = "";
-        b += "<button onclick=init(3)>Easy</button>";
-        b += "<button onclick=init(5)>Medium</button>";
-        b += "<button onclick=init(6)>Hard</button>";
-        b += "<div>Difficulty : <span id=difficulty></span></div>"; 
-        b += "Rules : "
-        b += "<div> <table cellspacing=0 align=center>";
-        for(i = 0; i < 7; ++i) {
-            b += "<th width="+W+" height="+W+" onclick=C('r',"+i+",1)" +
-                    " style='border:2px solid #aae' id=r"+i+1+
-                    " bgcolor=#"+(i&1?"9090d0>":"c0c0ff>");
-        }
-        b += "</tr> </table> </div>";
-        b += "<div><table cellspacing=0 align=center>";
-        for(i = 0; i < 4; ++i) {
-            for(j = 0; j < 3; ++j) {
-                b += "<th width="+W+" height="+W+" onclick=C('b',"+i+","+j+")" +
-                     " style='border:2px solid #aae' id=b"+i+j +
-                     " bgcolor=#"+((3*i+j)&1?"9090d0>":"c0c0ff>");
-            }
-            b += "</tr>";
-        }
-        b += "</table> </div>";
-        b += "<div> <table cellspacing=0 align=center>";
-        for(i = 0; i < 7; ++i) {
-            b += "<th width="+W+" height="+W+" onclick=C('r',"+i+",0)" +
-                    " style='border:2px solid #aae' id=r"+i+0+
-                    " bgcolor=#"+(i&1?"9090d0>":"c0c0ff>");
-        }
-        b += "</tr> </table> </div>";
-        document.write(b);
-    }
-    writeHtml();
-
-    function C(part, i, j) {
-        if(selectedPos == -1) {
-            selectedPos = part+i+j;
-        } else {
-            if(selectedPos[0] == 'b' && part == 'b') {
-                i0 = parseInt(selectedPos[1]);
-                j0 = parseInt(selectedPos[2]);
-                p = 3*i0+j0;
-                config.play("move", config.board[p], p, 3*i+j);
-            } else if(selectedPos[0] == 'r' && selectedPos[2] == '0' && part == 'b'){
-                i0 = parseInt(selectedPos[1]);
-                p = i0;
-                config.play("drop", config.reserve0[p], p, 3*i+j);
-            }
-            draw();
-            if(config.winner() != -1) {
-                alert("Player : " + config.winner() + " has won !");
-                init(difficulty);
-                draw();
-            }
-            selectedPos = -1;
-            if(config.currentPlayer == 1) {
-                config.autoPlay(difficulty);
-                draw();
-                if(config.winner() != -1) {
-                    alert("Player " + config.winner() + " has won !");
-                    init(difficulty);
-                    draw();
-                }
-            }
-        }
-        draw();
-    }
-
-    function draw() {
-        W = 100
-        path = "img/simple/";
-        ext = ".gif"
-        if(q = document.getElementById("difficulty")) {
-            q.innerHTML = (difficulty == 3 ? 'Easy' : (difficulty == 5 ? 'Medium' : 'Hard'));
-        }
-        for(i = 0; i < 4; ++i) {
-            for(j = 0; j < 3; ++j) {
-                id = "b"+i+j;
-                if (q = document.getElementById(id)) {
-                    p = 3*i+j;
-                    charCode = config.board[3*i+j];
-                    if(charCode === '.') charCode = 'e';
-                    q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
-                    q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
-                }
-            }
-        }
-        for(i = 0; i < 7; ++i) {
-            id = "r"+i+0;
-            if (q = document.getElementById(id)) {
-                charCode = (i < config.reserve0.length ? config.reserve0[i] : 'e');
-                if(charCode === '.') charCode = 'e';
-                q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
-                q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
-            }
-        }
-        for(i = 0; i < 7; ++i) {
-            id = "r"+i+1;
-            if (q = document.getElementById(id)) {
-                charCode = (i < config.reserve1.length ? config.reserve1[i] : 'e');
-                if(charCode === '.') charCode = 'e';
-                q.innerHTML = "<img width="+W+" src="+path + charCode + ext+">";
-                q.style.borderColor = id == selectedPos ? "#ff0" : "#aae";
-            }
-        }
-    }
-    draw();
-
+    let yokai = Yokai.Default()
 </script>
+<script type="module">
+    import { INPUT_EVENT_TYPE, COLOR, Chessboard, MARKER_TYPE } from "./js/interface/Chessboard.js"
+
+    function inputHandler(event) {
+        event.chessboard.removeMarkers(undefined, MARKER_TYPE.dot)
+        event.chessboard.removeMarkers(undefined, MARKER_TYPE.square)
+        if (event.type === INPUT_EVENT_TYPE.moveStart) {
+            // const moves = chess.moves({ square: event.square, verbose: true });
+            // event.chessboard.addMarker(event.square, MARKER_TYPE.square)
+            // for (const move of moves) {
+            //     event.chessboard.addMarker(move.to, MARKER_TYPE.dot)
+            // }
+            // return moves.length > 0
+            return true
+        } else if (event.type === INPUT_EVENT_TYPE.moveDone) {
+            const move = { from: event.squareFrom, to: event.squareTo }
+            const result = yokai.move(move)
+            // const result = true
+            if (result) {
+                event.chessboard.removeMarkers(undefined, MARKER_TYPE.square)
+                event.chessboard.disableMoveInput()
+                event.chessboard.setPosition(yokai.getPosition())
+                const gameover = yokai.winner() != -1
+                if(!gameover) {
+                    setTimeout(() => { // smoother with 500ms delay
+                        yokai.autoMove(difficulty)
+                        event.chessboard.enableMoveInput(inputHandler, COLOR.white)
+                        event.chessboard.setPosition(yokai.getPosition())
+                    }, 500)
+                    setTimeout(() => {
+                        if (yokai.winner() != -1) {
+                            alert("You have lost :(")
+                            yokai = Yokai.Default()
+                            event.chessboard.setPosition(yokai.getPosition())
+                        }
+                    }, 1000)
+                } else {
+                    setTimeout(() => {
+                        alert("You have won !")
+                        yokai = Yokai.Default()
+                        event.chessboard.setPosition(yokai.getPosition())
+                    }, 1000)
+                }
+            } else {
+                console.warn("invalid move", move)
+            }
+            return result
+        }
+    }
+
+    const board = new Chessboard(document.getElementById("board"), {
+        position: "start"
+    })
+    
+    board.enableMoveInput(inputHandler, COLOR.white)
+</script>
+
+<script language="javascript">
+    function setDifficulty(diff) {
+        difficulty = diff;
+        const field = document.getElementById("difficultyField")
+        field.innerHTML = "Selected difficulty : " + (difficulty == 3 ? "Easy" : (difficulty == 5 ? "Medium" : "Hard"))
+    }
+</script>
+<button onclick="setDifficulty(3)"> Easy </button>
+<button onclick="setDifficulty(5)"> Medium </button>
+<button onclick="setDifficulty(7)"> Hard </button>
+<div id="difficultyField"></div>
+<script>
+    setDifficulty(5)
+</script>
+</body>
+</html>
