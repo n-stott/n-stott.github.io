@@ -1,197 +1,130 @@
-searchBestMove = Module.cwrap('searchBestMove', 'number', ['string', 'string', 'string', 'number', 'number'])
-get_board = Module.cwrap('board', 'string', [])
-get_reserve0 = Module.cwrap('reserve0', 'string', [])
-get_reserve1 = Module.cwrap('reserve1', 'string', [])
 
-validAction = Module.cwrap('validAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
-playAction = Module.cwrap('playAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
 
 class Yokai {
 
-    constructor(board, reserve0, reserve1, player) {
+    constructor(WasmModule, board, reserve0, reserve1, player) {
         this.board = board;
         this.reserve0 = reserve0;
         this.reserve1 = reserve1;
         this.currentPlayer = player;
+        this.apiSearchBestMove = WasmModule.cwrap('searchBestMove', 'number', ['string', 'string', 'string', 'number', 'number'])
+        this.apiInit = WasmModule.cwrap('init', 'void', [])
+        this.apiBoard = WasmModule.cwrap('board', 'string', [])
+        this.apiReserve0 = WasmModule.cwrap('reserve0', 'string', [])
+        this.apiReserve1 = WasmModule.cwrap('reserve1', 'string', [])
+        this.apiValidAction = WasmModule.cwrap('validAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
+        this.apiPlayAction = WasmModule.cwrap('playAction', 'number', ['string', 'string', 'string', 'number', 'string', 'string', 'number', 'number'])
+        this.initInternal()
     }
 
-    static Default() {
-        return new Yokai('TKB.P..p.bkt', '', '', 0);
+    static Default(WasmModule) {
+        return new Yokai(WasmModule, 'TKB.P..p.bkt', '', '', 0);
     }
 
-    update() {
-        this.board = get_board()
-        this.reserve0 = get_reserve0()
-        this.reserve1 = get_reserve1()
-        this.currentPlayer = 1-this.currentPlayer
+    pieceToInternal(piece) {
+        if (piece !== '.') {
+            if (piece.toUpperCase() === piece) {
+                piece = piece.toLowerCase()
+            } else {
+                piece = piece.toUpperCase()
+            }
+            if(piece === 'r') piece = 't'
+            if(piece === 'R') piece = 'T'
+            if(piece === 'q') piece = 's'
+            if(piece === 'Q') piece = 'S'
+        }
+        return piece
+    }
+
+    pieceFromInternal(piece) {
+        if (piece !== '.') {
+            if(piece === 't') piece = 'r'
+            if(piece === 'T') piece = 'R'
+            if(piece === 's') piece = 'q'
+            if(piece === 'S') piece = 'Q'
+            if (piece.toUpperCase() === piece) {
+                piece = piece.toLowerCase()
+            } else {
+                piece = piece.toUpperCase()
+            }
+        }
+        return piece
     }
 
     setPosition(fen) {
+        this.reserve0 = ""
+        this.board = ""
+        this.reserve1 = ""
         if (fen) {
             const parts = fen.split(/\//)
-            {
-                const row = parts[0]
-                const reserve0 = ""
-                for (let c = 0; c < row.length; c++) {
-                    const char = row.substr(c, 1)
-                    let piece = '.'
-                    if (char !== '.') {
-                        if (char.toUpperCase() === char) {
-                            piece = char.toLowerCase()
-                        } else {
-                            piece = char.toUpperCase()
-                        }
-                        if(piece === 'r') piece = 't'
-                        if(piece === 'R') piece = 'T'
-                        if(piece === 'q') piece = 's'
-                        if(piece === 'Q') piece = 'S'
-                    }
-                    reserve0 += piece
-                }
-                this.reserve0 = reserve0
+
+            const res0 = parts[0]
+            for (let c = 0; c < res0.length; c++) {
+                const piece = res0.substr(c, 1)
+                this.reserve0 += this.pieceToInternal(piece)
             }
-            {
-                const board = "";
-                for (let part = 3; part >= 0; --part) {
-                    const row = parts[1+3-part]
-                    for (let c = 0; c < 3; c++) {
-                        const char = row.substr(c, 1)
-                        let piece = '.'
-                        if (char !== '.') {
-                            if (char.toUpperCase() === char) {
-                                piece = char.toLowerCase()
-                            } else {
-                                piece = char.toUpperCase()
-                            }
-                            if(piece === 'r') piece = 't'
-                            if(piece === 'R') piece = 'T'
-                            if(piece === 'q') piece = 's'
-                            if(piece === 'Q') piece = 'S'
-                        }
-                        board += piece
-                    }
+
+            for (let part = 3; part >= 0; --part) {
+                const row = parts[1+3-part]
+                for (let c = 0; c < 3; c++) {
+                    const piece = row.substr(c, 1)
+                    this.board += this.pieceToInternal(piece)
                 }
-                this.board = board
             }
-            {
-                const row = parts[5]
-                const reserve1 = ""
-                for (let c = 0; c < row.length; c++) {
-                    const char = row.substr(c, 1)
-                    let piece = '.'
-                    if (char !== '.') {
-                        if (char.toUpperCase() === char) {
-                            piece = char.toLowerCase()
-                        } else {
-                            piece = char.toUpperCase()
-                        }
-                        if(piece === 'r') piece = 't'
-                        if(piece === 'R') piece = 'T'
-                        if(piece === 'q') piece = 's'
-                        if(piece === 'Q') piece = 'S'
-                    }
-                    reserve1 += piece
-                }
-                this.reserve1 = reserve1
+            
+            const res1 = parts[5]
+            for (let c = 0; c < res1.length; c++) {
+                const piece = res1.substr(c, 1)
+                this.reserve1 += this.pieceToInternal(piece)
             }
         }
-        console.log("set fen : ", fen, this.board, this.reserve0, this.reserve1)
     }
 
     getPosition() {
         let parts = new Array(6).fill("")
-        {
-            for (let i = 0; i < this.reserve0.length; i++) {
-                let piece = this.reserve0[i]
-                if (!piece) {
-                } else {
-                    if(piece === 't') piece = 'r'
-                    if(piece === 'T') piece = 'R'
-                    if(piece === 's') piece = 'q'
-                    if(piece === 'S') piece = 'Q'
-                    if (piece.toUpperCase() === piece) {
-                        piece = piece.toLowerCase()
-                    } else {
-                        piece = piece.toUpperCase()
-                    }
-                    parts[0] += piece
-                }
+        for (let i = 0; i < this.reserve0.length; i++) {
+            let piece = this.reserve0[i]
+            if (!piece) { } else {
+                parts[0] += this.pieceFromInternal(piece)
             }
-            for (let i = this.reserve0.length; i < 7; i++) parts[0] += '.'
         }
+        for (let i = this.reserve0.length; i < 7; i++) parts[0] += '.'
+
         for (let part = 3; part >= 0; --part) {
             for (let i = 0; i < 3; i++) {
                 let piece = this.board[3*part+i]
                 if (!piece) {
                     parts[1+part] += "."
                 } else {
-                    if(piece === 't') piece = 'r'
-                    if(piece === 'T') piece = 'R'
-                    if(piece === 's') piece = 'q'
-                    if(piece === 'S') piece = 'Q'
-                    if (piece.toUpperCase() === piece) {
-                        piece = piece.toLowerCase()
-                    } else {
-                        piece = piece.toUpperCase()
-                    }
-                    parts[1+3-part] += piece
+                    parts[1+3-part] += this.pieceFromInternal(piece)
                 }
             }
         }
-        {
-            for (let i = 0; i < this.reserve1.length; i++) {
-                let piece = this.reserve1[i]
-                if (!piece) {
-                } else {
-                    if(piece === 't') piece = 'r'
-                    if(piece === 'T') piece = 'R'
-                    if(piece === 's') piece = 'q'
-                    if(piece === 'S') piece = 'Q'
-                    if (piece.toUpperCase() === piece) {
-                        piece = piece.toLowerCase()
-                    } else {
-                        piece = piece.toUpperCase()
-                    }
-                    parts[5] += piece
-                }
+
+        for (let i = 0; i < this.reserve1.length; i++) {
+            let piece = this.reserve1[i]
+            if (!piece) { } else {
+                parts[5] += this.pieceFromInternal(piece)
             }
-            for (let i = this.reserve1.length; i < 7; i++) parts[5] += '.'
         }
+        for (let i = this.reserve1.length; i < 7; i++) parts[5] += '.'
+
         const fen = parts.join("/")
-        console.log("get fen : ", this.board, this.reserve0, this.reserve1, fen)
         return fen
     }
 
-    autoPlay(depth) {
-        console.log("before AI : ", this.toString());
-        searchBestMove(
-            this.board,
-            this.reserve0,
-            this.reserve1,
-            this.currentPlayer,
-            depth
-        )
-        this.update()
-        console.log("after AI : ", this.toString());
-    }
-
     autoMove(depth) {
-        console.log("before AI : ", this.toString());
-        searchBestMove(
-            this.board,
-            this.reserve0,
-            this.reserve1,
-            this.currentPlayer,
-            depth
-        )
+        var t0 = performance.now()
+        this.searchBestMove(depth)
+        var t1 = performance.now()
+        console.log("AutoMove took " + (t1 - t0) + " milliseconds.")
         this.update()
-        console.log("after AI : ", this.toString());
+        this.swapPlayer()
     }
 
-    move(move) {
+    moveToAction(move) {
         const src = move.from
         const dst = move.to
-        console.log('play', src, dst);
         const idst = parseInt(dst[1]);
         const jdst = parseInt(dst[2]);
         const d = 3*idst+jdst;
@@ -199,40 +132,52 @@ class Yokai {
             const isrc = parseInt(src[1]);
             const jsrc = parseInt(src[2]);
             const s = 3*isrc+jsrc;
-            return this.play("move", this.board[s], s, d);
+            return { action: "move", piece: this.board[s], src: s, dst: d};
         } else if(src[0] == 'r' && src[2] == '0' && dst[0] == 'b'){
             const i0 = parseInt(src[1]);
             const p = i0;
-            return this.play("drop", this.reserve0[p], p, d);
+            return { action: "drop", piece: this.reserve0[p], src: p, dst: d};
+        } else if(src[0] == 'r' && src[2] == '1' && dst[0] == 'b'){
+            const i0 = parseInt(src[1]);
+            const p = i0;
+            return { action: "drop", piece: this.reserve1[p], src: p, dst: d};
         }
+        return undefined
+    }
+
+    move(move) {
+        const action = this.moveToAction(move)
+        if(action) {
+            return this.play(action.action, action.piece, action.src, action.dst)
+        }
+        return false;
+    }
+
+    moves(square) {
+        let moves = [];
+        for(let i = 0; i < 4; ++i) {
+            for(let j = 0; j < 3; ++j) {
+                const to = 'b'+i+j;
+                const move = {from:square, to:to}
+                if(this.validMove(move)) {
+                    moves.push(move)
+                }
+            }
+        }
+        return moves
+    }
+
+    validMove(move) {
+        const action = this.moveToAction(move)
+        return this.validAction(action.action, action.piece, action.src, action.dst)
     }
 
     play(action, piece, start, end) {
-        console.log("attempting : ", action, piece, start, end, this.board, this.reserve0, this.reserve1)
-        let valid = validAction(
-            this.board,
-            this.reserve0,
-            this.reserve1,
-            this.currentPlayer,
-            action,
-            piece,
-            start,
-            end
-        )
+        let valid = this.validAction(action, piece, start, end)
         if(valid) {
-            console.log("before HU : ", this.toString());
-            playAction(
-                this.board,
-                this.reserve0,
-                this.reserve1,
-                this.currentPlayer,
-                action,
-                piece,
-                start,
-                end
-            )
+            this.playAction(action, piece, start, end)
             this.update()
-            console.log("after HU : ", this.toString());
+            this.swapPlayer()
         }
         return valid;
     }
@@ -245,6 +190,35 @@ class Yokai {
 
     toString() {
         return this.board + '|' + this.reserve0 + '|' + this.reserve1;
+    }
+
+    swapPlayer() {
+        this.currentPlayer = 1-this.currentPlayer
+    }
+
+    // Low level api
+
+    initInternal() {
+        this.apiInit();
+    }
+
+    validAction(action, piece, start, end) {
+        return this.apiValidAction(this.board, this.reserve0, this.reserve1, this.currentPlayer, action, piece, start, end)
+    }
+
+    playAction(action, piece, start, end) {
+        return this.apiPlayAction(this.board, this.reserve0, this.reserve1, this.currentPlayer, action, piece, start, end)
+    }
+
+    searchBestMove(depth) {
+        console.log("searchBestMove", this.board, this.reserve0, this.reserve1, this.currentPlayer, depth)
+        return this.apiSearchBestMove(this.board, this.reserve0, this.reserve1, this.currentPlayer, depth)
+    }
+
+    update() {
+        this.board = this.apiBoard()
+        this.reserve0 = this.apiReserve0()
+        this.reserve1 = this.apiReserve1()
     }
     
 }
